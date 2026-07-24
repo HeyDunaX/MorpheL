@@ -1,0 +1,42 @@
+experiment:
+  name: morphel-custom-language-32k
+  seed: 42
+
+language:
+  code: xx
+  name: "Custom Language"
+  vowels: "abc..." # Replace with actual vowel inventory
+  word_boundary_policy: whitespace
+  lowercase: false
+  notes: "Template for new languages."
+
+dataset:
+  name: "your_dataset_here"
+  subset: null
+  revision: null
+  induction_splits:
+    - train
+  evaluation_splits:
+    - validation
+  text_columns:
+    - text
+
+tokenizer:
+  vocab_size: 32000
+  min_frequency: 2
+  top_k: 4
+  temperature: 1.0
+  mi_threshold: 0.0
+  model_max_length: 512
+  use_vowel_boundary_filter: true
+  special_tokens:
+    - "<s>"
+    - "<pad>"
+    - "</s>"
+    - "<unk>"
+    - "<mask>"
+
+output:
+  directory: outputs/tokenizers/morphel-custom-32k
+  hub_repo: null
+  overwrite: false

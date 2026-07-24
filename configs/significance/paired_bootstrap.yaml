@@ -1,0 +1,13 @@
+experiment:
+  type: "paired_bootstrap"
+  description: "Stratified paired bootstrap for metric difference confidence intervals."
+  seed: 42
+
+parameters:
+  resamples: 10000
+  confidence_level: 0.95
+  stratified: true
+
+metrics:
+  - "accuracy"
+  - "macro_f1"

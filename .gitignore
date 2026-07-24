@@ -1,0 +1,154 @@
+# MorpheL — .gitignore
+# =====================================================================
+# Python
+# =====================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+MANIFEST
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# =====================================================================
+# Secrets and credentials — NEVER commit these
+# =====================================================================
+.env
+.env.*
+*.env
+HF_TOKEN
+HUGGINGFACE_TOKEN
+*.token
+*.key
+*.secret
+*.pem
+*.p8
+*.p12
+*.pfx
+*_creds.json
+*_credentials.json
+secrets/
+credentials/
+.netrc
+
+# =====================================================================
+# Hugging Face / ML artifacts — use download scripts instead
+# =====================================================================
+.cache/
+huggingface/
+transformers_cache/
+datasets_cache/
+~/.cache/huggingface/
+*.safetensors
+pytorch_model.bin
+pytorch_model-*.bin
+model.safetensors
+tf_model.h5
+flax_model.msgpack
+optimizer.pt
+scheduler.pt
+training_args.bin
+
+# fastText embeddings — multi-gigabyte; do not commit
+*.bin
+*.vec
+*.txt.gz
+cc.*.300.bin
+wiki.*.bin
+
+# Raw datasets — use download scripts
+*.parquet
+*.arrow
+*.jsonl.gz
+xnli_*
+raw_data/
+
+# =====================================================================
+# Large model checkpoints
+# =====================================================================
+checkpoints/
+checkpoint-*/
+outputs/*/checkpoint-*/
+runs/
+wandb/
+mlflow/
+neptune/
+
+# =====================================================================
+# Notebooks with identifying metadata
+# =====================================================================
+*.ipynb
+
+# =====================================================================
+# OS artifacts
+# =====================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =====================================================================
+# IDE and editor
+# =====================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.orig
+.project
+.pydevproject
+
+# =====================================================================
+# Local output directories — use results/ for committed outputs
+# =====================================================================
+outputs/
+tmp/
+temp/
+scratch/
+/logs/
+
+# =====================================================================
+# Local absolute paths (Windows and Unix)
+# =====================================================================
+# These patterns catch accidental inclusion of local config files that
+# embed machine-specific paths.
+*local_config*
+*local_settings*

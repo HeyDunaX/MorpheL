@@ -1,0 +1,46 @@
+experiment:
+  name: morphel-standard-french-32k
+  seed: 42
+
+language:
+  code: fr
+  name: French
+  vowels: "aeiouyAEIOUYàâéèêëîïôùûüÿÀÂÉÈÊËÎÏÔÙÛÜŸœŒ"
+  word_boundary_policy: whitespace
+  lowercase: false
+  notes: "Includes accented vowels, y, and oe ligature forms."
+
+dataset:
+  name: facebook/xnli
+  subset: fr
+  revision: null
+  induction_splits:
+    - train
+    - validation
+    - test
+  evaluation_splits:
+    - validation
+    - test
+  text_columns:
+    - premise
+    - hypothesis
+
+tokenizer:
+  vocab_size: 32000
+  min_frequency: 2
+  top_k: 4
+  temperature: 1.0
+  mi_threshold: 0.0
+  model_max_length: 512
+  use_vowel_boundary_filter: true
+  special_tokens:
+    - "<s>"
+    - "<pad>"
+    - "</s>"
+    - "<unk>"
+    - "<mask>"
+
+output:
+  directory: outputs/tokenizers/morphel-fr-32k
+  hub_repo: null
+  overwrite: false

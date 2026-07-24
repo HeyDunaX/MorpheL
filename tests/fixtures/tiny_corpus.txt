@@ -1,0 +1,9 @@
+Merhaba, bu bir test cümlesidir.
+XLM-RoBERTa is a multilingual model.
+Привет! Как дела?
+L'école est très importante.
+Mười hai tháng năm.
+Testing with punctuation: (parentheses), "quotes", and hyphens-are-fun.
+Short words: a, an, to, of, the.
+Numbers 12345 should not break.
+Special <s> </s> <unk> <mask>.

@@ -1,0 +1,26 @@
+# Ensure consistent line endings across platforms
+* text=auto eol=lf
+
+# Force binary treatment for ML artifact files
+*.pkl binary
+*.bin binary
+*.safetensors binary
+*.pt binary
+*.pth binary
+*.npy binary
+*.npz binary
+*.parquet binary
+*.arrow binary
+
+# Diff drivers for structured text files
+*.yaml diff=yaml
+*.json diff=json
+*.md diff=markdown
+*.py diff=python
+
+# Export-ignore: files excluded from `git archive` tarballs
+.gitattributes export-ignore
+.gitignore export-ignore
+.editorconfig export-ignore
+.pre-commit-config.yaml export-ignore
+.github/ export-ignore

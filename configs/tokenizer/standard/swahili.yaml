@@ -1,0 +1,46 @@
+experiment:
+  name: morphel-standard-swahili-32k
+  seed: 42
+
+language:
+  code: sw
+  name: Swahili
+  vowels: "aeiouAEIOU"
+  word_boundary_policy: whitespace
+  lowercase: false
+  notes: "Standard Latin vowels."
+
+dataset:
+  name: facebook/xnli
+  subset: sw
+  revision: null
+  induction_splits:
+    - train
+    - validation
+    - test
+  evaluation_splits:
+    - validation
+    - test
+  text_columns:
+    - premise
+    - hypothesis
+
+tokenizer:
+  vocab_size: 32000
+  min_frequency: 2
+  top_k: 4
+  temperature: 1.0
+  mi_threshold: 0.0
+  model_max_length: 512
+  use_vowel_boundary_filter: true
+  special_tokens:
+    - "<s>"
+    - "<pad>"
+    - "</s>"
+    - "<unk>"
+    - "<mask>"
+
+output:
+  directory: outputs/tokenizers/morphel-sw-32k
+  hub_repo: null
+  overwrite: false
