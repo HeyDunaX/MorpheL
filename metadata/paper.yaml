@@ -1,7 +1,7 @@
-title: "MorpheL: MI-guided stochastic morphology-aware tokenizer for pretrained models"
-venue: "Anonymous NLP Conference"
-year: 2026
-authors: [] # Anonymized
+title: "When Morphology Matters: MorpheL for Tokenizer Adaptation under Constrained Adaptation"
+venue: ""
+year: 
+authors: []
 doi: ""
 abstract: |
   We introduce MorpheL, a morphology-aware tokenizer...
