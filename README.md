@@ -1,4 +1,4 @@
-# MorpheL: MI-guided Stochastic Morphology-Aware Tokenizer
+# When Morphology Matters: MorpheL for Tokenizer Adaptation under Constrained Adaptation
 
 A novel tokenization toolkit that leverages mutual information between morphological boundaries for vocabulary induction and applies Gumbel-max sampling to induce stochastic segmentation diversity during training.
 
