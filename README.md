@@ -355,6 +355,29 @@ MorpheL is designed to guarantee full deterministic reproducibility.
 
 ---
 
+## Ethics Statement
+
+This work uses existing, publicly available benchmark data and does not collect
+new data from human participants. The XNLI experiments use the corresponding
+language subsets and training splits of XNLI, while the machine translation
+experiment uses the English--Turkish configuration of OPUS-100.
+
+Tokenizer induction uses only target-language training text; validation and test
+text and evaluation labels are excluded from tokenizer construction. No
+personally identifiable information is collected, inferred, or used as part of
+the proposed method.
+
+As with other multilingual benchmarks, the results may reflect biases,
+limitations, and coverage differences present in the underlying datasets and
+pretrained language resources. We therefore interpret the reported gains within
+the evaluated languages and tasks rather than as evidence of universal
+morphological or linguistic behavior.
+
+Users of the released implementation should follow the original licenses and
+usage requirements of the datasets, pretrained models, and third-party
+software components on which the experiments depend.
+
+---
 ## License
 
 MorpheL is released as open-source software under the **MIT License**.
