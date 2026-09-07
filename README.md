@@ -6,7 +6,7 @@ A morphology-aware tokenization method that uses corpus-level mutual information
 > This repository accompanies the paper:  
 > **Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning**
 
-> Nhan Tran, Hung To, Hai Nguyen. Submission to SoICT 2026
+> Nhan Tran, Hung To, Nguyen Thi Tuyet Hai. Submission to SoICT 2026
 
 ---
 
@@ -406,7 +406,7 @@ resources used with MorpheL.
 ```bibtex
 @inproceedings{morphel,
     title = "{Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning}",
-    author = "Nhan Tran, Hung To and Hai Nguyen",
+    author = "Nhan Tran, Hung To and Nguyen Thi Tuyet Hai",
     booktitle = "{SoICT Submission}",
     year = "{2026}"
 }
