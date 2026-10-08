@@ -57,7 +57,9 @@ and intrinsic evaluation.
   `morphel_vocab.json`, `mi_index.pkl`, and `segmentation_cache.pkl`.
 - Provides a Hugging Face-compatible wrapper for downstream integration.
 
-<img width="1344" height="864" alt="MorpheL" src="https://github.com/user-attachments/assets/0966c21a-096c-4108-aed6-59209fe15cbb" />
+<p align="center">
+  <img src="figures/morphel_tokenizer.png" alt="MorpheL Architecture" width="100%" />
+</p>
 
 ---
 
