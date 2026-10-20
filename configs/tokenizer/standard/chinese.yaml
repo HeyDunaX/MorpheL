@@ -6,9 +6,9 @@ language:
   code: zh
   name: Chinese
   vowels: ""
-  word_boundary_policy: TODO_PROJECT_OWNER_SPECIFY_SEGMENTER
+  word_boundary_policy: character
   lowercase: false
-  notes: "Vowel filter disabled. Requires custom word segmenter."
+  notes: "Vowel filter disabled. Character-level tokenization for Chinese text."
 
 dataset:
   name: facebook/xnli

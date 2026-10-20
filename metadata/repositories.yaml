@@ -1,3 +1,9 @@
-- github_url: "https://github.com/HeyDunaX/MorpheL" 
-  huggingface_url: "" 
-  description: "Official code and models for MorpheL"
+- github_url: "https://github.com/HeyDunaX/MorpheL"
+  huggingface_models:
+    - "https://huggingface.co/NIRVLab/xnli-morphel-tr-32k"
+    - "https://huggingface.co/NIRVLab/xnli-morphel-ru-32k"
+    - "https://huggingface.co/NIRVLab/xnli-morphel-fr-32k"
+    - "https://huggingface.co/NIRVLab/xnli-morphel-vi-32k"
+    - "https://huggingface.co/NIRVLab/xnli-morphel-sw-32k"
+    - "https://huggingface.co/NIRVLab/xnli-morphel-zh-32k"
+  description: "Official code and tokenizers for MorpheL (SOICT 2026)"

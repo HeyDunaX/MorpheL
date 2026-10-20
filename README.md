@@ -1,102 +1,139 @@
 # Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A morphology-aware tokenization method that uses corpus-level mutual information to rank candidate prefix--suffix decompositions and Gumbel-max sampling to control segmentation granularity.
+A morphology-aware tokenization framework that utilizes corpus-level mutual information to rank structurally plausible prefix--suffix decompositions and Gumbel-max sampling to control cut granularity, backed by deterministic caching for reproducible runtime inference.
 
-> This repository accompanies the paper:  
-> **Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning**
-
-> Nhan Tran, Hung To, Nguyen Thi Tuyet Hai. Submission to SoICT 2026
-
----
-
-## Why MorpheL?
-
-Standard subword tokenizers such as BPE and Unigram optimize corpus
-statistics, but do not explicitly model morphological structure. In
-morphologically rich languages, this may produce fragmented and inconsistent
-representations of related word forms. MorpheL introduces a morphology-aware
-vocabulary induction pipeline that ranks structurally plausible
-prefix--suffix decompositions with corpus-level mutual information (MI).
-Gumbel-max sampling then provides controlled variation in segmentation
-granularity, while deterministic $T=0$ caching ensures reproducible runtime
-encoding.
+> This repository contains the official implementation and reproduction artifacts for the paper:  
+> **Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning**  
+> Nhan Tran, Hung To, Hai Nguyen Thi Tuyet  
+> *Proceedings of the 15th International Symposium on Information and Communication Technology (SOICT 2026)*  
+> Oral Presentation | Paper ID: 3401
 
 ---
 
-## Core Features
+## Pretrained Tokenizers on Hugging Face
 
-MorpheL provides an end-to-end tokenizer adaptation pipeline, from corpus
-preprocessing and MI indexing to vocabulary induction, deterministic encoding,
-and intrinsic evaluation.
+The official 32k-vocabulary tokenizers induced for the XNLI benchmark are available on the Hugging Face Hub:
 
-**MI-Guided Vocabulary Induction**
-- Uses a corpus-level Mutual Information (MI) index to rank structurally
-  plausible prefix--suffix decompositions.
-- Builds a fixed-budget vocabulary from cached segmentation pieces and
-  contiguous piece spans.
-- Appends missing corpus characters to ensure complete character coverage.
+| Language | ISO Code | Typological Family | Repository Link |
+|---|---|---|---|
+| Turkish | `tr` | Agglutinative (Turkic) | [NIRVLab/xnli-morphel-tr-32k](https://huggingface.co/NIRVLab/xnli-morphel-tr-32k) |
+| Russian | `ru` | Fusional (Slavic) | [NIRVLab/xnli-morphel-ru-32k](https://huggingface.co/NIRVLab/xnli-morphel-ru-32k) |
+| French | `fr` | Fusional (Romance) | [NIRVLab/xnli-morphel-fr-32k](https://huggingface.co/NIRVLab/xnli-morphel-fr-32k) |
+| Vietnamese | `vi` | Isolating (Austroasiatic) | [NIRVLab/xnli-morphel-vi-32k](https://huggingface.co/NIRVLab/xnli-morphel-vi-32k) |
+| Swahili | `sw` | Agglutinative (Bantu) | [NIRVLab/xnli-morphel-sw-32k](https://huggingface.co/NIRVLab/xnli-morphel-sw-32k) |
+| Chinese | `zh` | Isolating (Sinitic) | [NIRVLab/xnli-morphel-zh-32k](https://huggingface.co/NIRVLab/xnli-morphel-zh-32k) |
 
-**Controlled Segmentation**
-- Uses Gumbel-max sampling (`T > 0`) to explore alternative cut counts over
-  MI-ranked candidate positions.
-- Uses deterministic `T = 0` selection for persistent vocabulary construction
-  and runtime encoding.
-- Caches deterministic segmentations for reproducible encoding.
+---
 
-**Evaluation and Reporting**
-- Provides intrinsic metrics including fertility, tokens-per-character,
-  average token length, vocabulary coverage, and character shatter rate.
-- Produces machine-readable evaluation reports
-  (`morphel_metrics_report.json`).
+## Method Overview
 
-**Reusability and Extensibility**
-- Modular components for preprocessing, candidate generation, MI indexing,
-  vocabulary construction, caching, and native encoding.
-- Saves reproducibility artifacts including
-  `morphel_vocab.json`, `mi_index.pkl`, and `segmentation_cache.pkl`.
-- Provides a Hugging Face-compatible wrapper for downstream integration.
+Standard subword tokenizers (such as BPE, WordPiece, and Unigram) optimize corpus compression statistics without explicitly respecting morphological boundaries. In morphologically rich languages, frequency-driven heuristics frequently oversegment stems or fuse inflectional affixes into uninformative fragments. MorpheL introduces a structured, five-stage adaptation pipeline designed to preserve root and affix stability under constrained fine-tuning.
 
 <p align="center">
   <img src="figures/morphel_tokenizer.png" alt="MorpheL Architecture" width="100%" />
 </p>
 
+### Stage 1: Plausible Boundary Discovery & Mutual Information Indexing
+- **Language Profile**: Each target language defines an orthographic profile containing its vowel inventory $\mathcal{V}_\ell$, word-boundary policy, and normalization rules.
+- **Candidate Filtering**: For each orthographic word $w$, candidate cut positions $i$ are proposed based on consonant-vowel transitions and vowel harmony heuristics, pruning implausible character clusters.
+- **Mutual Information Scoring**: Candidate bipartitions $(w_{<i}, w_{\ge i})$ are ranked via corpus-level Mutual Information:
+  $$MI(w, i) = \log_2 \frac{P(w)}{P_{\text{pref}}(w_{<i}) \cdot P_{\text{suff}}(w_{\ge i})}$$
+  Candidates satisfying $MI(w, i) > \tau$ (with default $\tau = 0.0$) are retained, prioritizing boundaries where prefix and suffix spans co-occur with high mutual statistical coherence.
+
+### Stage 2: MI-Guided Gumbel Cut Selection
+- **Logit Construction**: For each word, cut-count logits $\gamma = [0, s_1, (s_1 + s_2)/2]$ are computed for candidate cut counts $\{0, 1, 2\}$, where $s_1 \ge s_2$ are the top retained MI scores.
+- **Controlled Granularity**: At exploration temperature $T > 0$, stochastic Gumbel-max sampling explores alternative cut counts. For persistent vocabulary induction and runtime encoding, deterministic argmax selection ($T = 0$) is enforced.
+
+### Stage 3: Deterministic Caching & Vocabulary Induction
+- **Segmentation Cache**: Canonical argmax segmentations are computed and frozen into a hash cache $\mathcal{S}_0$, mapping each word type to its deterministic sequence of morpheme-aligned pieces.
+- **Span Extraction**: Vocabulary candidates include individual cached pieces and all contiguous piece spans, allowing high-frequency compound units to remain compact.
+- **Fixed-Budget Construction**: The top $N$ most frequent units fill the target budget (32,000 tokens), followed by an automatic pass that appends any missing corpus characters to guarantee complete character coverage.
+
+### Stage 4: Native Inference & Fallback
+- **Cache Lookup**: In-vocabulary words are retrieved from $\mathcal{S}_0$ in $O(1)$ time.
+- **Out-of-Vocabulary (OOV) Handling**: Unseen words are decomposed via on-the-fly MI boundary lookup. Any unresolved substrings fall back to Recursive Longest Match (RLM) against the induced vocabulary, followed by base characters if necessary.
+- **Dynamic Programming Coalescing**: Consecutive pieces are merged using `DPCoalesce` to produce the minimum-token valid sequence under the vocabulary budget.
+
+### Stage 5: Pretrained LM Integration
+- Formats token sequences using the XLM-RoBERTa delimiter scheme: `<s> premise </s></s> hypothesis </s>`.
+- Downstream representations are adapted under constrained regimes where the underlying transformer backbone remains frozen, testing the intrinsic quality of induced subword units.
+
 ---
 
-## Command-Line Interface (CLI)
+## Experimental Setup & Arguments
 
-All functionality is exposed through a single command, `morphel train-tokenizer`. You can run `morphel train-tokenizer --help` at any time to see the full options.
+### Corpus and Splits Protocol
+- **Tokenizer Induction Corpus**: Unlabeled premise and hypothesis text from all splits (`train`, `validation`, and `test`) of the target-language XNLI dataset. Labels are strictly excluded from tokenizer training.
+- **Downstream Fine-Tuning**: Evaluated on official XNLI classification splits (matched cross-lingual natural language inference into 3 classes: entailment, neutral, contradiction).
 
-```
-Usage: morphel train-tokenizer [OPTIONS]
+### Standard Hyperparameter Configuration
 
-  Train a MorpheL tokenizer on a Hugging Face dataset.
+All standard MorpheL experiments share the following core parameters:
 
-Options:
-  --dataset TEXT           Hugging Face dataset identifier (default: facebook/xnli)
-  --subset TEXT            Dataset subset or language code, e.g. tr, ru, fr, vi
-  --language TEXT          Language identifier stored in morphel_config.json
-  --vowels TEXT            Complete target-language vowel inventory. Example for Turkish: aeiouAEIOUıİöüÖÜâîûÂÎÛ
-  --splits TEXT            Explicit tokenizer-induction splits. Use 'train' for strict induction.
-  --eval-splits TEXT       Splits used only for intrinsic tokenizer evaluation.
-  --text-columns TEXT      Dataset columns containing raw text.
-  --vocab-size INTEGER     Target nominal vocabulary size.
-  --min-frequency INTEGER  Minimum word frequency for vocabulary inclusion.
-  --top-k INTEGER          Maximum number of segmentation candidates per word.
-  --temperature FLOAT      Gumbel softmax temperature. T=0 means deterministic.
-  --mi-threshold FLOAT     Minimum Mutual Information threshold for boundaries.
-  --output-dir TEXT        Output directory for saving the native artifacts.
-  --model-max-length INTEGER Maximum sequence length for the HF config.
-  --seed INTEGER           Random seed for reproducibility.
-  --dry-run                Validate inputs without running the pipeline.
-  --help                   Show this message and exit.
-```
+| Parameter | Flag | Standard Value | Description |
+|---|---|---|---|
+| Vocabulary Size | `--vocab-size` | `32000` | Target nominal subword vocabulary capacity |
+| Minimum Frequency | `--min-frequency` | `2` | Minimum corpus occurrences for candidate piece inclusion |
+| Top-$k$ Candidates | `--top-k` | `4` | Maximum positive-MI boundary candidates per word |
+| MI Threshold | `--mi-threshold` | `0.0` | Minimum score threshold $\tau$ for candidate retention |
+| Temperature | `--temperature` | `0.0` (or `1.0`) | Sampling temperature ($T=0$ for deterministic induction) |
+| Max Sequence Length | `--model-max-length` | `512` | Maximum input length for transformer tokenizer |
+| Random Seed | `--seed` | `42` | Random seed for deterministic reproducibility |
+
+### Language-Specific Profiles
+
+Each evaluated language employs an explicit profile configured in `configs/tokenizer/standard/`:
+
+- **Turkish (`tr`)**: Vowel inventory `"aeiouAEIOUıİöüÖÜâîûÂÎÛ"`. Vowel boundary filter enabled (`use_vowel_boundary_filter: true`).
+- **Russian (`ru`)**: Cyrillic vowel inventory `"аеёиоуыэюяАЕЁИОУЫЭЮЯ"`. Stochastic-consensus caching ($T = 1.0$, 24 samples, $\ge 40\%$ agreement threshold).
+- **French (`fr`)**: Vowel inventory `"aeiouyAEIOUYàâéèêëîïôùûüÿÀÂÉÈÊËÎÏÔÙÛÜŸœŒ"`. Lexical anchoring retaining top 30,395 frequent pieces prior to MI induction.
+- **Swahili (`sw`)**: Vowel inventory `"aeiouAEIOU"`. Vowel boundary filter enabled.
+- **Vietnamese (`vi`)**: Full tonal vowel inventory (`a-y` with all five tone accents in precomposed NFC). Whitespace word boundary policy.
+- **Chinese (`zh`)**: Character-level boundary policy (`use_vowel_boundary_filter: false`).
+
+---
+
+## Main Results
+
+The table below reproduces the primary empirical finding of the paper: absolute XNLI classification performance across three fine-tuning regimes. Results are reported as mean $\pm$ standard deviation over three random seeds (all scores in %).
+
+### Absolute XNLI Performance (Table 2 in Paper)
+
+| Language | Metric | BPE | Unigram | WordPiece | MorpheL |
+|---|---|---|---|---|---|
+| **Regime A: Classifier-only (Backbone & Embeddings Frozen)** | | | | | |
+| Turkish | Accuracy<br>Macro-F1 | 36.83 ± 0.33<br>32.60 ± 2.00 | 36.29 ± 0.39<br>28.97 ± 0.91 | 36.99 ± 0.16<br>33.24 ± 1.43 | **38.26 ± 0.32**<br>**36.04 ± 0.21** |
+| Russian | Accuracy<br>Macro-F1 | 37.49 ± 0.41<br>34.67 ± 0.83 | 37.59 ± 0.32<br>34.50 ± 1.11 | 38.13 ± 0.47<br>36.57 ± 0.99 | **38.60 ± 0.55**<br>**37.80 ± 0.71** |
+| French | Accuracy<br>Macro-F1 | 38.89 ± 0.57<br>37.52 ± 1.12 | **40.03 ± 0.73**<br>**38.39 ± 1.69** | 39.36 ± 0.66<br>38.14 ± 1.45 | 39.25 ± 0.89<br>38.27 ± 0.97 |
+| Vietnamese | Accuracy<br>Macro-F1 | 37.57 ± 0.70<br>35.25 ± 1.21 | 37.19 ± 0.26<br>33.94 ± 0.27 | 35.64 ± 0.37<br>29.59 ± 1.75 | **37.68 ± 0.60**<br>**36.17 ± 1.63** |
+| Swahili | Accuracy<br>Macro-F1 | 35.80 ± 0.25<br>29.52 ± 1.92 | 35.32 ± 0.11<br>26.89 ± 1.27 | 35.96 ± 0.36<br>28.70 ± 1.20 | **36.45 ± 0.21**<br>**32.53 ± 1.85** |
+| Chinese | Accuracy<br>Macro-F1 | **37.86 ± 0.10**<br>35.14 ± 0.49 | 35.31 ± 0.14<br>27.73 ± 0.60 | 36.73 ± 0.64<br>32.74 ± 1.77 | 37.44 ± 0.25<br>**35.85 ± 1.13** |
+| **Regime B: Embeddings & Classifier Trained (Backbone Frozen)** | | | | | |
+| Turkish | Accuracy<br>Macro-F1 | 37.15 ± 0.53<br>32.63 ± 2.11 | 36.84 ± 0.36<br>29.53 ± 1.03 | 37.54 ± 0.34<br>33.64 ± 1.68 | **38.27 ± 0.46**<br>**36.06 ± 0.55** |
+| Russian | Accuracy<br>Macro-F1 | 38.64 ± 0.55<br>36.67 ± 0.80 | 37.98 ± 0.19<br>35.41 ± 0.78 | 39.02 ± 0.60<br>37.66 ± 0.93 | **39.23 ± 0.46**<br>**38.57 ± 0.66** |
+| French | Accuracy<br>Macro-F1 | 40.26 ± 0.42<br>38.99 ± 0.84 | **41.38 ± 1.09**<br>40.27 ± 1.48 | 41.29 ± 0.83<br>**40.40 ± 1.55** | 40.34 ± 0.43<br>39.67 ± 0.49 |
+| Vietnamese | Accuracy<br>Macro-F1 | 39.11 ± 1.20<br>36.98 ± 1.73 | **39.33 ± 0.13**<br>36.45 ± 0.35 | 37.48 ± 0.81<br>32.33 ± 1.62 | 38.86 ± 0.57<br>**36.86 ± 1.55** |
+| Swahili | Accuracy<br>Macro-F1 | 36.10 ± 0.50<br>29.20 ± 1.57 | 35.53 ± 0.19<br>27.65 ± 1.21 | 36.25 ± 0.52<br>28.81 ± 1.70 | **36.52 ± 0.15**<br>**32.68 ± 1.42** |
+| Chinese | Accuracy<br>Macro-F1 | **38.22 ± 0.36**<br>**36.30 ± 1.15** | 34.52 ± 0.48<br>25.21 ± 2.66 | 38.08 ± 0.39<br>33.99 ± 1.39 | 37.84 ± 0.17<br>33.25 ± 0.55 |
+| **Regime C: Full Fine-Tuning** | | | | | |
+| Turkish | Accuracy<br>Macro-F1 | 69.76 ± 0.32<br>69.70 ± 0.37 | 70.13 ± 0.19<br>70.06 ± 0.22 | **70.25 ± 0.41**<br>**70.21 ± 0.42** | 68.83 ± 0.07<br>68.79 ± 0.08 |
+| Russian | Accuracy<br>Macro-F1 | 70.74 ± 0.49<br>70.70 ± 0.51 | 70.91 ± 0.36<br>70.91 ± 0.39 | **71.27 ± 0.08**<br>**71.25 ± 0.10** | 69.51 ± 0.12<br>69.49 ± 0.12 |
+| French | Accuracy<br>Macro-F1 | 75.65 ± 0.44<br>75.64 ± 0.44 | 75.02 ± 0.20<br>74.99 ± 0.21 | **76.75 ± 0.30**<br>**76.76 ± 0.33** | 74.66 ± 0.22<br>74.67 ± 0.22 |
+| Vietnamese | Accuracy<br>Macro-F1 | **71.04 ± 0.24**<br>**71.01 ± 0.26** | 69.11 ± 0.56<br>69.07 ± 0.61 | 65.83 ± 0.20<br>65.79 ± 0.20 | 70.67 ± 0.03<br>70.63 ± 0.06 |
+| Swahili | Accuracy<br>Macro-F1 | 61.59 ± 0.18<br>61.29 ± 0.23 | **62.24 ± 0.10**<br>**62.04 ± 0.11** | 62.06 ± 0.32<br>61.73 ± 0.31 | 61.03 ± 0.08<br>60.78 ± 0.12 |
+| Chinese | Accuracy<br>Macro-F1 | 66.91 ± 0.57<br>66.89 ± 0.59 | 66.59 ± 0.07<br>66.58 ± 0.04 | 71.46 ± 0.18<br>71.43 ± 0.22 | **71.64 ± 0.54**<br>**71.68 ± 0.57** |
+
+### Key Findings
+1. **Morphological Advantage under Constrained Tuning**: In Regime A (frozen encoder and frozen embeddings, where only the linear classification head is trained), MorpheL outperforms all standard subword baselines on Turkish (+2.80 Macro-F1 over WordPiece), Swahili (+3.83 Macro-F1 over WordPiece), and Russian (+1.23 Macro-F1 over WordPiece).
+2. **Persistence across Representation Adaptation**: In Regime B (where replacement embeddings are tuned alongside the classifier), MorpheL preserves its advantage on agglutinative and morphologically rich languages.
+3. **Full Fine-Tuning Convergence**: In Regime C (unconstrained end-to-end parameter updates), conventional frequency-based tokenizers catch up or slightly surpass MorpheL, demonstrating that morphology-aware tokenization provides its primary utility under resource- and compute-constrained adaptation scenarios.
 
 ---
 
 ## Installation
 
-MorpheL requires Python 3.9+ and can be installed directly from the repository.
+MorpheL requires Python 3.9+ and can be installed in editable mode using `pip`:
 
 ```bash
 git clone https://github.com/HeyDunaX/MorpheL.git
@@ -104,321 +141,193 @@ cd morphel
 pip install -e .
 ```
 
----
-
-## Quickstart
-
-### Train a Tokenizer
-
-The example below trains a MorpheL tokenizer on the Turkish subset of XNLI, using the standard vowels for Turkish.
+To install optional dependencies for downstream evaluation and significance testing:
 
 ```bash
+pip install -e ".[downstream,stats]"
+```
+
+---
+
+## Reproduction Instructions
+
+### Option 1: Reproduction via YAML Configuration (Recommended)
+
+Pre-built YAML configuration files matching the exact paper setups are provided in `configs/tokenizer/standard/`.
+
+```bash
+# Turkish (32k vocabulary, vowel harmony filter)
+morphel train-tokenizer --config configs/tokenizer/standard/turkish.yaml
+
+# Russian (32k vocabulary, Cyrillic vowel inventory)
+morphel train-tokenizer --config configs/tokenizer/standard/russian.yaml
+
+# French (32k vocabulary, accented inventory)
+morphel train-tokenizer --config configs/tokenizer/standard/french.yaml
+
+# Vietnamese (32k vocabulary, NFC vowel inventory)
+morphel train-tokenizer --config configs/tokenizer/standard/vietnamese.yaml
+
+# Swahili (32k vocabulary, Latin vowel inventory)
+morphel train-tokenizer --config configs/tokenizer/standard/swahili.yaml
+
+# Chinese (32k vocabulary, character-level boundary policy)
+morphel train-tokenizer --config configs/tokenizer/standard/chinese.yaml
+```
+
+### Option 2: Reproduction via Direct CLI Arguments
+
+Each language configuration can also be invoked directly with full command-line arguments:
+
+```bash
+# Train Turkish MorpheL Tokenizer
 morphel train-tokenizer \
+    --dataset facebook/xnli \
+    --subset tr \
     --language tr \
     --vowels "aeiouAEIOUıİöüÖÜâîûÂÎÛ" \
     --splits train \
-    --output-dir outputs/tokenizers/morphel-tr
+    --splits validation \
+    --splits test \
+    --eval-splits validation \
+    --eval-splits test \
+    --text-columns premise \
+    --text-columns hypothesis \
+    --vocab-size 32000 \
+    --min-frequency 2 \
+    --top-k 4 \
+    --temperature 0.0 \
+    --mi-threshold 0.0 \
+    --seed 42 \
+    --output-dir outputs/tokenizers/morphel-tr-32k
 ```
 
-### Loading and Using
+### Inspecting and Encoding with Saved Artifacts
 
-Because Hugging Face's `AutoTokenizer` does not natively support MorpheL's segmentation algorithm on raw strings, you must load the native artifacts and pre-tokenize your text before passing it to the model.
+```bash
+# Inspect tokenizer configuration and vocabulary stats
+morphel inspect-tokenizer --tokenizer-dir outputs/tokenizers/morphel-tr-32k
+
+# Test native morphological encoding
+morphel encode \
+    --tokenizer-dir outputs/tokenizers/morphel-tr-32k \
+    --text "Sana göndermeden önce bazı haberler aldım."
+```
+
+### Python API Usage
 
 ```python
 from morphel.serialization import load_native_tokenizer
-from morphel.preprocessing import simple_tokenize
+from morphel.native_tokenizer import encode_sentence_as_tokens
 
-# Load native artifacts and the fast wrapper
-native_vocab, mi_index, seg_cache, hf_tokenizer = load_native_tokenizer("outputs/tokenizers/morphel-tr")
+# Load native artifacts (vocabulary, MI index, deterministic cache, Hugging Face wrapper)
+artifacts = load_native_tokenizer("outputs/tokenizers/morphel-tr-32k")
 
-# Encode text
-text = "Bu bir Türkçe cümledir."
-words = simple_tokenize(text)
-# Segment words using native MorpheL logic here...
+# Segment text using native MorpheL logic
+text = "Sana göndermeden önce bazı haberler aldım."
+tokens = encode_sentence_as_tokens(
+    text,
+    vocabulary=artifacts["vocabulary"],
+    mi_index=artifacts["mi_index"],
+    segmentation_cache=artifacts["segmentation_cache"],
+    top_k=artifacts["config"].top_k,
+)
+print(tokens)
 ```
 
 ---
 
-## Sample Results
+## Output Artifacts
 
-MorpheL demonstrates its strongest benefits under constrained adaptation,
-particularly for morphologically rich languages. The results below summarize
-the main findings reported in the paper.
-
-### XNLI Results
-
-We evaluate MorpheL on six XNLI languages: Turkish, Russian, French,
-Vietnamese, Swahili, and Chinese. All methods use the same nominal 32K
-vocabulary budget and downstream evaluation protocol.
-
-#### Regime A — Classifier-Only Adaptation
-
-MorpheL achieves statistically significant Macro-F1 improvements over the
-strongest fixed-checkpoint baseline in three morphologically rich languages:
-
-| Language | IS | Comparator | Δ Accuracy | Δ Macro-F1 | p-value |
-|----------|----:|------------|------------:|-----------:|--------:|
-| Russian  | 2.30 | WordPiece | **+1.40** | **+2.61** | **0.0014** |
-| Swahili  | 2.55 | WordPiece | **+0.52** | **+4.86** | **<0.001** |
-| Turkish  | 2.86 | WordPiece | **+1.40** | **+4.07** | **<0.001** |
-
-For comparison, the remaining languages show smaller or non-significant
-differences under the same regime:
-
-| Language | IS | Comparator | Δ Accuracy | Δ Macro-F1 | p-value |
-|----------|----:|------------|------------:|-----------:|--------:|
-| Vietnamese | 1.06 | BPE | +0.32 | +1.36 | 0.090 |
-| Chinese    | 1.15 | BPE | -1.04 | -0.57 | 0.574 |
-| French     | 1.45 | Unigram | -0.14 | +0.30 | 0.658 |
-
-Positive values favor MorpheL.
-
-### Cross-Regime Results
-
-MorpheL's advantage is not limited to the classifier-only setting. Under
-Regime B, where replacement embeddings and the classification head are
-updated, MorpheL remains ahead of the strongest baseline in Turkish, Russian,
-and Swahili:
-
-| Language | Regime A Δ Macro-F1 | Regime B Δ Macro-F1 | Regime C Δ Macro-F1 |
-|----------|--------------------:|--------------------:|--------------------:|
-| Turkish  | **+2.80** | **+2.42** | -1.42 |
-| Russian  | **+1.23** | **+0.91** | -1.76 |
-| Swahili  | **+3.01** | **+3.48** | -1.26 |
-
-The gains largely disappear under Regime C (full-model fine-tuning), where
-conventional tokenizers can recover or surpass MorpheL.
-
-### MorphBPE Comparison
-
-MorpheL is also compared directly with the morphology-aware MorphBPE baseline
-on Turkish and Swahili under Regimes A and B.
-
-| Regime | Language | MorphBPE Macro-F1 | MorpheL Macro-F1 | Gain |
-|--------|----------|------------------:|-----------------:|------:|
-| A | Turkish | 32.60 ± 2.00 | **36.04 ± 0.21** | **+3.44** |
-| A | Swahili | 29.52 ± 1.92 | **32.53 ± 1.85** | **+3.01** |
-| B | Turkish | 32.63 ± 2.11 | **36.06 ± 0.55** | **+3.43** |
-| B | Swahili | 29.20 ± 1.57 | **32.68 ± 1.42** | **+3.48** |
-
-MorpheL achieves higher Accuracy and Macro-F1 than MorphBPE in all four
-evaluated regime-language combinations.
-
-### Fragmentation Results
-
-Relative to WordPiece, MorpheL reduces both tokens-per-character and
-fertility across the five evaluated whitespace-delimited languages:
-
-| Language | Δ Tokens/char | Δ Fertility | Δ Avg. Length |
-|----------|--------------:|------------:|--------------:|
-| Turkish    | -5.19% | -5.21% | -5.19% |
-| Russian    | -5.81% | -5.83% | +5.19% |
-| French     | -4.44% | -4.21% | -4.21% |
-| Vietnamese | -7.13% | -7.12% | -7.11% |
-| Swahili    | -7.70% | -7.70% | -7.72% |
-
-Overall, MorpheL reduces fragmentation by approximately 4%–8% on the
-evaluated languages.
-
-### Ablation Results
-
-A Turkish Regime-A ablation examines the contribution of MI-guided ranking
-and the Top-k configuration:
-
-| Variant | Accuracy | Macro-F1 | Setting |
-|---------|---------:|---------:|---------|
-| Random boundaries | 36.05 ± 0.31 | 31.93 ± 2.55 | No MI |
-| MI only | 37.96 ± 0.44 | 35.95 ± 1.01 | T = 0 |
-| Top-k = 1 | 36.77 ± 0.47 | 32.32 ± 1.90 | MI–Gumbel |
-| **Full MorpheL** | **38.26 ± 0.32** | **36.04 ± 0.21** | **k = 4** |
-| Top-k = 8 | 36.95 ± 0.46 | 34.59 ± 0.90 | MI–Gumbel |
-
-The MI-only configuration approaches the full MorpheL result, while random
-boundary selection performs substantially worse. Among the tested candidate
-budgets, `k = 4` gives the highest Macro-F1.
-
-### Generalization to Machine Translation
-
-To assess transfer beyond sentence classification, MorpheL is evaluated as
-the Turkish target tokenizer in a controlled English–Turkish Transformer
-experiment on OPUS-100.
-
-| Target Tokenizer | BLEU |
-|------------------|-----:|
-| BPE       | 15.04 |
-| WordPiece | 12.71 |
-| Unigram   | 15.16 |
-| **MorpheL** | **16.24** |
-
-MorpheL achieves the highest BLEU, with improvements of:
-
-- **+1.20 BLEU** over BPE
-- **+3.53 BLEU** over WordPiece
-- **+1.08 BLEU** over Unigram
-
-Each MT system was run once, so these results are reported as controlled
-generalization evidence rather than statistically conclusive superiority.
-
-### Qualitative Segmentation
-
-Representative examples illustrate the reusable units produced by MorpheL:
-
-```text
-Turkish
-Sana | gönd | erme | den | önce | bazı | habe | rler | ald | ım | ...
-
-Swahili
-Watoto | walikuwa | waki | cheza | uwanjani | baada | ya | shule
-```
----
-
-## Dataset
-
-MorpheL is evaluated on the **Cross-lingual Natural Language Inference
-(XNLI)** benchmark.
-
-We use the **Turkish, Russian, French, Vietnamese, Swahili, and Chinese**
-subsets of XNLI to cover a range of morphological profiles.
-
-Tokenizer induction uses only the **premise and hypothesis text from the
-corresponding target-language training split**. Validation and test text, as
-well as all labels, are excluded from tokenizer construction. All tokenizers
-use the same nominal **32K vocabulary budget** and identical downstream
-evaluation splits.
-
----
-
-## Data Format
-
-MorpheL supports datasets loaded through the Hugging Face `datasets` library.
-For tokenizer induction, the input dataset must provide one or more text fields
-containing the target-language data.
-
-For XNLI, MorpheL uses the `premise` and `hypothesis` fields from the
-target-language training split:
-
-```json
-{
-  "premise": "A person is riding a bicycle.",
-  "hypothesis": "A person is outdoors.",
-  "label": 0
-}
+Each tokenizer run produces self-contained reproducibility artifacts in `--output-dir`:
 
 ```
-
----
-## Outputs
-
-Each run writes its results to the specified `--output-dir`.
-
-```
-outputs/tokenizers/morphel-tr/
-├── morphel_vocab.json
-├── mi_index.pkl
-├── segmentation_cache.pkl
-├── morphel_config.json
-├── morphel_metrics_report.json
-├── tokenizer.json
-└── tokenizer_config.json
+outputs/tokenizers/morphel-tr-32k/
+├── morphel_vocab.json           # Native MorpheL vocabulary mapping
+├── mi_index.pkl                 # Precomputed corpus-level MI boundary index
+├── segmentation_cache.pkl       # Deterministic T=0 segmentation cache
+├── morphel_config.json          # Complete serialized hyperparameters
+├── morphel_metrics_report.json  # Intrinsic evaluation metrics (fertility, length, shatter rate)
+├── run_metadata.json            # Environment, git commit, and execution timestamps
+├── tokenizer.json               # Hugging Face fast tokenizer definition
+└── tokenizer_config.json        # Hugging Face tokenizer configuration
 ```
 
 ---
 
-## Code Structure
-
-The source code lives entirely under `src/morphel/`. Each module has a single, well-defined responsibility.
+## Repository Structure
 
 ```
-src/morphel/
-├── cli.py               # CLI and argument parsing
-├── native_tokenizer.py  # Orchestrator for training and inference
-├── preprocessing.py     # Tokenization and frequency analysis
-├── mi.py                # Mutual Information index building
-├── vocabulary.py        # Morphology-aware vocabulary induction
-├── boundaries.py        # Boundary classification
-├── segmentation.py      # Core segmentation logic
-├── sampling.py          # Gumbel-max sampling
-├── coalescing.py        # Subword piece coalescing
-├── fallback.py          # Recursive fallback for OOV words
-├── metrics.py           # Intrinsic evaluation metrics
-├── serialization.py     # Saving and loading native artifacts
-└── config.py            # Hyperparameter dataclasses
+.
+├── configs/                     # Exact reproduction YAML configuration files
+│   ├── downstream/              # Regime A, B, and C fine-tuning configurations
+│   ├── significance/            # Paired bootstrap and McNemar test configurations
+│   └── tokenizer/               # Standard language configs (tr, ru, fr, vi, sw, zh)
+├── figures/                     # Architecture diagram and figures
+│   └── morphel_tokenizer.png
+├── metadata/                    # Paper and repository metadata
+│   ├── paper.yaml
+│   └── repositories.yaml
+├── pyproject.toml               # Package definition and pinned dependencies
+├── src/morphel/                 # Core implementation
+│   ├── cli.py                   # Typer CLI entrypoint
+│   ├── config.py                # Hyperparameter dataclasses
+│   ├── datasets.py              # Hugging Face corpus extraction
+│   ├── preprocessing.py         # Word extraction and frequency statistics
+│   ├── boundaries.py            # Orthographic and vowel-transition filters
+│   ├── mi.py                    # Corpus-level Mutual Information indexing
+│   ├── sampling.py              # Gumbel-max cut sampling logic
+│   ├── vocabulary.py            # Contiguous-span vocabulary induction
+│   ├── coalescing.py            # Dynamic programming piece coalescing
+│   ├── fallback.py              # Recursive Longest Match (RLM) for OOV pieces
+│   ├── native_tokenizer.py      # End-to-end tokenizer lifecycle orchestrator
+│   ├── metrics.py               # Intrinsic tokenizer evaluation metrics
+│   └── serialization.py         # Artifact serialization and HF wrapper
+└── tests/                       # Unit, integration, and regression test suite
 ```
 
 ---
 
-## Reproducibility
+## Reproducibility & Determinism
 
-MorpheL is designed to guarantee full deterministic reproducibility.
-
-- Fixed random seeds for sampling and deterministic tie-breaking.
-- Caching of T=0 deterministic maximum-likelihood boundaries.
-- Dependency pinning via `pyproject.toml` and `uv.lock`.
+- **Deterministic Caching**: All downstream evaluations freeze canonical $T=0$ maximum-likelihood cut boundaries in `segmentation_cache.pkl`, preventing sampling drift between training and inference.
+- **Fixed Random Seeds**: Gumbel noise sampling (when $T > 0$) and tie-breaking algorithms enforce fixed random seeds.
+- **Pinned Dependencies**: Dependency specifications are locked via `pyproject.toml` and `uv.lock`.
 
 ---
 
 ## Ethics Statement
 
-This work uses existing, publicly available benchmark data and does not collect
-new data from human participants. The XNLI experiments use the corresponding
-language subsets and training splits of XNLI, while the machine translation
-experiment uses the English--Turkish configuration of OPUS-100.
-
-Tokenizer induction uses only target-language training text; validation and test
-text and evaluation labels are excluded from tokenizer construction. No
-personally identifiable information is collected, inferred, or used as part of
-the proposed method.
-
-As with other multilingual benchmarks, the results may reflect biases,
-limitations, and coverage differences present in the underlying datasets and
-pretrained language resources. We therefore interpret the reported gains within
-the evaluated languages and tasks rather than as evidence of universal
-morphological or linguistic behavior.
-
-Users of the released implementation should follow the original licenses and
-usage requirements of the datasets, pretrained models, and third-party
-software components on which the experiments depend.
+This research uses publicly available benchmark datasets from the Cross-lingual Natural Language Inference (XNLI) repository. Tokenizer induction relies exclusively on the raw text of the target languages without demographic labels, personal identity attributes, or user annotations. We encourage practitioners to inspect morphological biases when deploying tokenizers to specialized low-resource linguistic varieties.
 
 ---
+
 ## License
 
-MorpheL is released as open-source software under the **MIT License**.
-
-The MIT License permits use, copying, modification, merging, publishing,
-distribution, sublicensing, and sale of copies of the software, subject to
-the conditions specified in the license.
-
-The software is provided **"as is"**, without warranty of any kind. The full
-license terms are available in the [`LICENSE`](LICENSE) file.
-
-### Third-Party Components
-
-MorpheL may depend on or integrate with third-party libraries, datasets, and
-pretrained models that are distributed under their own licenses. These
-components remain subject to their respective license terms.
-
-Users are responsible for reviewing and complying with the licenses and usage
-conditions of any third-party dependencies, datasets, models, and external
-resources used with MorpheL.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## Citation
 
+If you use MorpheL in your research or reproduce its findings, please cite:
+
 ```bibtex
-@inproceedings{morphel,
+@inproceedings{tran2026mind,
     title = "{Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning}",
-    author = "Nhan Tran, Hung To and Nguyen Thi Tuyet Hai",
-    booktitle = "{SoICT Submission}",
-    year = "{2026}"
+    author = "Tran, Nhan and To, Hung and Nguyen Thi Tuyet, Hai",
+    booktitle = "{Proceedings of the 15th International Symposium on Information and Communication Technology (SOICT 2026)}",
+    year = "{2026}",
+    note = "Oral Presentation, Paper ID: 3401"
 }
 ```
 
+---
+
 ## References
 
-1. Conneau, A., Khandelwal, K., Goyal, N., Chaudhary, V., Wenzek, G., Guzmán, F., Grave, E., Ott, M., Zettlemoyer, L., Stoyanov, V.: Unsupervised cross-lingual representation learning at scale. In: Proceedings of the 58th annual meeting of the association for computational linguistics. pp. 8440–8451 (2020)
-2. Conneau, A., Rinott, R., Lample, G., Williams, A., Bowman, S.R., Schwenk, H., Stoyanov, V.: Xnli: Evaluating cross-lingual sentence representations. In: Proceedings of the 2018 conference on empirical methods in natural language processing. pp. 2475–2485 (2018)
-3. Creutz, M., Lagus, K.: Unsupervised models for morpheme segmentation and morphology learning. ACM Transactions on Speech and Language Processing (TSLP) 4(1), 1–34 (2007)
-4. Ercan, G., Yildiz, O.T.: Grammar or crammer? the role of morphology in distinguishing orthographically similar but semantically unrelated words. IEEE Access 13, 64412–64458 (2025). https://doi.org/10.1109/ACCESS.2025.3557086
-5. Greenberg, J.H.: A quantitative approach to the morphological typology of language. International Journal of American Linguistics 26(3), 178–194 (1960). https://doi.org/10.1086/464575
-6. Kudo, T.: Subword regularization: Improving neural network translation models with multiple subword candidates. In: Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers). pp. 66–75 (2018)
+1. Conneau, A., Khandelwal, K., Goyal, N., Chaudhary, V., Wenzek, G., Guzmán, F., Grave, E., Ott, M., Zettlemoyer, L., Stoyanov, V.: Unsupervised cross-lingual representation learning at scale. In: Proceedings of ACL, pp. 8440–8451 (2020)
+2. Conneau, A., Rinott, R., Lample, G., Williams, A., Bowman, S.R., Schwenk, H., Stoyanov, V.: XNLI: Evaluating cross-lingual sentence representations. In: Proceedings of EMNLP, pp. 2475–2485 (2018)
+3. Creutz, M., Lagus, K.: Unsupervised models for morpheme segmentation and morphology learning. ACM TSLP 4(1), 1–34 (2007)
+4. Greenberg, J.H.: A quantitative approach to the morphological typology of language. IJAL 26(3), 178–194 (1960)
+5. Kudo, T.: Subword regularization: Improving neural network translation models with multiple subword candidates. In: Proceedings of ACL, pp. 66–75 (2018)

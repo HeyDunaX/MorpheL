@@ -152,3 +152,36 @@ scratch/
 # embed machine-specific paths.
 *local_config*
 *local_settings*
+
+# =====================================================================
+# LaTeX sources, intermediate build files, and PDFs
+# =====================================================================
+*.tex
+*.sty
+*.cls
+*.bib
+*.bbl
+*.blg
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+
+# =====================================================================
+# Makefiles
+# =====================================================================
+[Mm]akefile*
+
+# =====================================================================
+# Paper draft & temporary artifacts
+# =====================================================================
+page_*.txt
+page_*.png
+page_*.jp2
+extracted_*
+MorpheL.pdf
+

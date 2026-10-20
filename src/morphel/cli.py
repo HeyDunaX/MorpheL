@@ -7,8 +7,15 @@ All expensive operations are preceded by validation from :mod:`morphel.validatio
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Annotated, Any, Optional
+
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 
 import typer
 import yaml

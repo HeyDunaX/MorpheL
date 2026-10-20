@@ -5,10 +5,10 @@ experiment:
 language:
   code: vi
   name: Vietnamese
-  vowels: "TODO_VERIFY_COMPLETE_VIETNAMESE_VOWEL_INVENTORY"
+  vowels: "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵAÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊOÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ"
   word_boundary_policy: whitespace
   lowercase: false
-  notes: "Vowel inventory pending project owner verification."
+  notes: "Complete Vietnamese vowel inventory including all tone-marked vowels (precomposed NFC)."
 
 dataset:
   name: facebook/xnli

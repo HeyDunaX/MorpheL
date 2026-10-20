@@ -1,7 +1,20 @@
-title: "When Morphology Matters: MorpheL for Tokenizer Adaptation under Constrained Adaptation"
-venue: ""
-year: 
-authors: []
+title: "Mind the Morphology: Morphology-Aware Tokenizer Adaptation under Constrained Fine-Tuning"
+venue: "Proceedings of the 15th International Symposium on Information and Communication Technology (SOICT 2026)"
+year: 2026
+authors:
+  - "Nhan Tran"
+  - "Hung To"
+  - "Hai Nguyen Thi Tuyet"
+paper_id: "3401"
+presentation: "Oral"
 doi: ""
 abstract: |
-  We introduce MorpheL, a morphology-aware tokenizer...
+  Standard subword tokenization methods like BPE and WordPiece optimize corpus
+  statistics without explicitly modeling morphological structures, which often
+  yields fragmented representations in morphologically rich languages. We introduce
+  MorpheL, a morphology-aware tokenizer adaptation pipeline that pairs corpus-level
+  mutual information (MI) to rank structurally plausible prefix--suffix decompositions
+  with Gumbel-max sampling to control cut granularity, backed by deterministic
+  caching for reproducible runtime inference. Under constrained adaptation (Regime A:
+  classifier-only, frozen representations), MorpheL achieves statistically significant
+  Macro-F1 gains over strong baselines in morphologically rich languages.
